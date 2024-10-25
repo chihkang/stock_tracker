@@ -72,11 +72,157 @@ pip install -e .
 
 ## 使用方法
 
+### 必要檔案設置
+
+在使用程式前，需要在專案根目錄建立 `portfolio.json` 檔案，用於儲存投資組合資訊：
+
+```json
+{
+  "totalValue": 6088899.07,
+  "exchange rate": "32.08",
+  "stocks": [
+    {
+      "name": "2330:TPE",
+      "price": 1060.0,
+      "quantity": 1000,
+      "currency": "TWD",
+      "lastUpdated": "2024-10-24T16:54:35+08:00",
+      "percentageOfTotal": 17.41
+    },
+    {
+      "name": "TSLA:NASDAQ",
+      "price": 213.65,
+      "quantity": 106,
+      "currency": "USD",
+      "lastUpdated": "2024-10-24T17:30:28+08:00",
+      "percentageOfTotal": 11.93
+    }
+  ]
+}
+```
+
+主要欄位說明：
+- `totalValue`: 投資組合總值（TWD）
+- `exchange rate`: USD-TWD 匯率
+- `stocks`: 股票清單
+  - `name`: 股票代號（格式：代號:市場）
+  - `price`: 股票價格
+  - `quantity`: 持股數量
+  - `currency`: 貨幣（TWD 或 USD）
+  - `lastUpdated`: 最後更新時間
+  - `percentageOfTotal`: 佔投資組合比例
+
 ### 命令列介面
 
-更新並顯示完整投資組合：
+程式支援多種操作模式：
+
+1. 更新並顯示完整投資組合：
 ```bash
 python -m stock_tracker portfolio
+```
+
+2. 查詢特定股票即時價格：
+```bash
+python -m stock_tracker query TSLA:NASDAQ VTI:NYSEARCA 2330:TPE
+```
+
+3. 使用指定的投資組合檔案：
+```bash
+python -m stock_tracker portfolio --file my_portfolio.json
+```
+
+### Python 程式中使用
+
+1. 基本查詢功能：
+```python
+from stock_tracker import get_multiple_stock_prices, format_output
+
+# 查詢多支股票
+symbols = ["VTI:NYSEARCA", "TSLA:NASDAQ", "2330:TPE"]
+prices = get_multiple_stock_prices(symbols)
+format_output(prices)
+```
+
+2. 使用投資組合管理：
+```python
+from stock_tracker import PortfolioManager
+
+# 初始化投資組合管理器
+portfolio = PortfolioManager('portfolio.json')
+
+# 更新價格
+portfolio.update_prices()
+
+# 顯示投資組合
+portfolio.print_portfolio()
+```
+
+3. 使用市場工具：
+```python
+from stock_tracker.utils import is_market_open, format_market_hours
+
+# 檢查市場是否開盤
+if is_market_open('NASDAQ'):
+    print("美股市場開盤中")
+
+# 顯示市場交易時間
+print(f"美股交易時間: {format_market_hours('NASDAQ')}")
+```
+
+## 檔案結構說明
+
+```
+stock_tracker/
+├── portfolio.json          # 投資組合設定檔（需自行創建）
+├── .env                    # 環境變數設定（可選）
+├── src/
+│   └── stock_tracker/     # 主程式碼
+├── tests/                 # 測試檔案
+└── README.md             # 說明文件
+```
+
+## 配置檔案
+
+### portfolio.json
+投資組合設定檔，定義：
+- 持有的股票清單
+- 每支股票的數量和成本
+- 匯率設定
+- 更新時間記錄
+
+### .env（可選）
+環境變數設定：
+```env
+BASE_URL=https://www.google.com/finance/quote/
+TIMEZONE=Asia/Taipei
+USER_AGENT=Mozilla/5.0
+REQUEST_TIMEOUT=10
+MAX_RETRIES=3
+```
+
+## 開發指南
+
+### 自定義開發
+
+1. 添加新的數據來源：
+```python
+# scraper/custom_source.py
+def get_stock_price_from_custom(symbol: str) -> dict:
+    # 實作自定義數據來源
+    pass
+```
+
+2. 擴展市場支援：
+```python
+# constants.py
+MARKET_HOURS['NEW_MARKET'] = {
+    'timezone': 'Asia/Tokyo',
+    'trading_days': range(0, 5),
+    'trading_hours': {
+        'start': time(9, 0),
+        'end': time(15, 30)
+    }
+}
 ```
 
 ## 交易時間管理

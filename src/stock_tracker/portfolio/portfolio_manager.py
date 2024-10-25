@@ -4,7 +4,12 @@ import pytz
 from prettytable import PrettyTable, PLAIN_COLUMNS
 from ..scraper.finance_scraper import get_multiple_stock_prices
 from ..scraper.exchange_rate_scraper import get_exchange_rate
-from ..utils.market_utils import should_update_price, get_market_from_symbol, format_market_hours
+from ..utils.market_utils import (
+    should_update_price,
+    get_market_from_symbol,
+    format_market_hours,
+    is_market_open
+)
 from ..utils.time_utils import get_current_timestamp
 
 class PortfolioManager:
@@ -53,36 +58,83 @@ class PortfolioManager:
         # 首先更新匯率
         self.update_exchange_rate()
         
-        # 收集需要更新的股票
+        # 收集需要更新的股票及其市場資訊
         symbols_to_update = []
+        market_status = {}
+        
         for stock in self.portfolio['stocks']:
+            market = get_market_from_symbol(stock['name'])
             if should_update_price(stock['name'], stock.get('lastUpdated')):
                 symbols_to_update.append(stock['name'])
+            # 記錄所有市場狀態
+            if market not in market_status:
+                market_status[market] = is_market_open(market)
+        
+        # 顯示當前市場狀態
+        print("\n市場狀態:")
+        for market, is_open in market_status.items():
+            trading_hours = format_market_hours(market)
+            if market in ['NASDAQ', 'NYSE', 'NYSEARCA']:
+                if is_open:
+                    print(f"{market}: {trading_hours} - 交易中")
+                else:
+                    print(f"{market}: {trading_hours} - 收盤中 (使用最新收盤價)")
+            else:
+                if is_open:
+                    print(f"{market}: {trading_hours} - 交易中")
+                else:
+                    print(f"{market}: {trading_hours} - 收盤中")
         
         if not symbols_to_update:
-            print("所有股票價格均在最新狀態，無需更新")
+            print("\n股票價格更新狀態:")
+            print("- 美股已收盤，使用最新收盤價")
+            print("- 台股無需更新")
+            
+            # 即使沒有更新價格，也重新計算總值和佔比
+            total_value_twd = self._calculate_total_value()
+            if abs(total_value_twd - self.portfolio['totalValue']) > 0.01:  # 檢查是否有變化
+                print("\n重新計算投資組合:")
+                print(f"- 原總值: TWD {self.portfolio['totalValue']:,.2f}")
+                print(f"- 新總值: TWD {total_value_twd:,.2f}")
+                
+                # 更新總值和佔比
+                self.portfolio['totalValue'] = total_value_twd
+                exchange_rate = float(self.portfolio['exchange rate'])
+                for stock in self.portfolio['stocks']:
+                    value_twd = stock['price'] * stock['quantity']
+                    if stock['currency'] == 'USD':
+                        value_twd *= exchange_rate
+                    stock['percentageOfTotal'] = round((value_twd / total_value_twd) * 100, 2)
+                
+                self._save_portfolio()
+                print("- 已更新投資組合佔比")
             return
             
-        # 顯示當前交易時間
-        print("\n市場交易時間:")
-        for market in set(get_market_from_symbol(symbol) for symbol in symbols_to_update):
-            print(f"{market}: {format_market_hours(market)}")
-        
         # 取得價格更新
         prices = get_multiple_stock_prices(symbols_to_update)
         
         # 更新股票價格
         update_count = 0
+        us_stocks_count = 0
+        local_stocks_count = 0
+        
         for stock in self.portfolio['stocks']:
             if stock['name'] in prices:
                 price_info = prices[stock['name']]
                 stock['price'] = price_info['price']
                 stock['lastUpdated'] = price_info['timestamp']
                 update_count += 1
+                
+                market = get_market_from_symbol(stock['name'])
+                if market in ['NASDAQ', 'NYSE', 'NYSEARCA']:
+                    us_stocks_count += 1
+                else:
+                    local_stocks_count += 1
         
-        if update_count > 0:
+        if update_count > 0 or local_stocks_count > 0:
             # 計算總值
             total_value_twd = self._calculate_total_value()
+            old_total = self.portfolio['totalValue']
             self.portfolio['totalValue'] = total_value_twd
             
             # 更新百分比
@@ -94,8 +146,14 @@ class PortfolioManager:
                 stock['percentageOfTotal'] = round((value_twd / total_value_twd) * 100, 2)
             
             self._save_portfolio()
-            print(f"已更新 {update_count} 支股票的價格")
-    
+            
+            print("\n更新統計:")
+            if us_stocks_count > 0:
+                print(f"- 更新了 {us_stocks_count} 支美股價格（收盤價）")
+            if local_stocks_count > 0:
+                print(f"- 更新了 {local_stocks_count} 支台股價格")
+            if abs(total_value_twd - old_total) > 0.01:
+                print(f"- 投資組合總值變動: TWD {old_total:,.2f} → TWD {total_value_twd:,.2f}")
     def print_portfolio(self):
         """顯示投資組合資訊"""
         # 建立表格

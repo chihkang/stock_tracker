@@ -1,45 +1,45 @@
 {
-  "totalValue": 7574109.464641218,
-  "exchange rate": "32.07",
+  "totalValue": 7568731.910316079,
+  "exchange rate": "32.09",
   "stocks": [
     {
       "name": "006208:TPE",
       "price": 115.0,
       "quantity": 19462,
       "currency": "TWD",
-      "lastUpdated": "2024-10-25T10:52:23.665561+08:00",
-      "percentageOfTotal": 29.55
+      "lastUpdated": "2024-10-25T11:20:31.757012+08:00",
+      "percentageOfTotal": 29.57
     },
     {
       "name": "00713:TPE",
-      "price": 57.4,
+      "price": 57.35,
       "quantity": 27671,
       "currency": "TWD",
-      "lastUpdated": "2024-10-25T10:52:24.129554+08:00",
+      "lastUpdated": "2024-10-25T11:20:32.216725+08:00",
       "percentageOfTotal": 20.97
     },
     {
       "name": "00687B:TWO",
-      "price": 30.68,
+      "price": 30.67,
       "quantity": 20000,
       "currency": "TWD",
-      "lastUpdated": "2024-10-25T10:52:25.552577+08:00",
+      "lastUpdated": "2024-10-25T11:20:33.411799+08:00",
       "percentageOfTotal": 8.1
     },
     {
       "name": "2330:TPE",
-      "price": 1070.0,
+      "price": 1065.0,
       "quantity": 1000,
       "currency": "TWD",
-      "lastUpdated": "2024-10-25T10:52:26.024770+08:00",
-      "percentageOfTotal": 14.13
+      "lastUpdated": "2024-10-25T11:20:33.874834+08:00",
+      "percentageOfTotal": 14.07
     },
     {
       "name": "2534:TPE",
       "price": 26.05,
       "quantity": 5000,
       "currency": "TWD",
-      "lastUpdated": "2024-10-25T10:52:26.502779+08:00",
+      "lastUpdated": "2024-10-25T11:20:34.355167+08:00",
       "percentageOfTotal": 1.72
     },
     {
@@ -48,7 +48,7 @@
       "quantity": 106,
       "currency": "USD",
       "lastUpdated": "2024-10-25T09:58:50.262597+08:00",
-      "percentageOfTotal": 11.69
+      "percentageOfTotal": 11.71
     },
     {
       "name": "NVDA:NASDAQ",
@@ -56,7 +56,7 @@
       "quantity": 90,
       "currency": "USD",
       "lastUpdated": "2024-10-25T09:58:50.686129+08:00",
-      "percentageOfTotal": 5.35
+      "percentageOfTotal": 5.36
     },
     {
       "name": "VTI:NYSEARCA",
@@ -64,8 +64,8 @@
       "quantity": 70.15851,
       "currency": "USD",
       "lastUpdated": "2024-10-25T09:58:51.180652+08:00",
-      "percentageOfTotal": 8.49
+      "percentageOfTotal": 8.5
     }
   ],
-  "exchange_rate_updated": "2024-10-25T10:52:23.133160+08:00"
+  "exchange_rate_updated": "2024-10-25T11:20:31.287104+08:00"
 }
