@@ -55,3 +55,6 @@ build/
 # Local development
 instance/
 .webassets-cache
+
+# Costomer files
+portfolio.json
