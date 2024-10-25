@@ -14,6 +14,11 @@
 - 即時匯率轉換
   - 自動從 Google Finance 獲取 USD-TWD 匯率
   - 匯率顯示至小數點後兩位
+- 投資組合視覺化
+  - 資產分配圓餅圖
+  - 市場分布圓餅圖
+  - 貨幣分布柱狀圖
+  - 完整支援繁體中文顯示
 - 模組化設計，易於擴充
 - 支援多種交易所
 
@@ -23,6 +28,7 @@
 - pip (Python 套件管理器)
 - venv (Python 虛擬環境工具)
 - tzdata (時區資料)
+- matplotlib (圖表生成，可選)
 
 ## 快速安裝
 
@@ -38,6 +44,8 @@ source venv/bin/activate && \
 pip install -r requirements.txt && \
 # 安裝專案
 pip install -e . && \
+# 安裝圖表支援（可選）
+pip install matplotlib && \
 # 測試執行
 python -m stock_tracker portfolio
 ```
@@ -65,7 +73,12 @@ venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-4. 安裝專案：
+4. 安裝圖表支援（可選）：
+```bash
+pip install matplotlib
+```
+
+5. 安裝專案：
 ```bash
 pip install -e .
 ```
@@ -121,15 +134,51 @@ pip install -e .
 python -m stock_tracker portfolio
 ```
 
-2. 查詢特定股票即時價格：
+2. 更新投資組合並生成視覺化圖表：
+```bash
+python -m stock_tracker portfolio --charts
+```
+
+3. 指定圖表輸出目錄：
+```bash
+python -m stock_tracker portfolio --charts --output-dir my_charts
+```
+
+4. 查詢特定股票即時價格：
 ```bash
 python -m stock_tracker query TSLA:NASDAQ VTI:NYSEARCA 2330:TPE
 ```
 
-3. 使用指定的投資組合檔案：
+5. 使用指定的投資組合檔案：
 ```bash
 python -m stock_tracker portfolio --file my_portfolio.json
 ```
+
+### 圖表功能
+
+執行 `portfolio --charts` 命令會生成三種視覺化圖表：
+
+1. **資產分配圖** (asset_allocation.png)
+   - 顯示各個股票佔投資組合的比例
+   - 使用圓餅圖呈現
+   - 包含詳細的百分比標示
+
+2. **市場分布圖** (market_distribution.png)
+   - 顯示不同市場（如 NASDAQ、TPE 等）的投資分布
+   - 使用圓餅圖呈現
+   - 自動合併相同市場的持股
+
+3. **貨幣分布圖** (currency_distribution.png)
+   - 顯示不同貨幣（TWD、USD）的投資比例
+   - 使用柱狀圖呈現
+   - 包含精確的百分比數值
+
+圖表特點：
+- 完整支援繁體中文顯示
+- 自動調整字體大小和位置
+- 清晰的色彩區分
+- 高解析度輸出 (300 DPI)
+- 自動保存至指定目錄
 
 ### Python 程式中使用
 
@@ -155,21 +204,12 @@ portfolio.update_prices()
 
 # 顯示投資組合
 portfolio.print_portfolio()
+
+# 生成圖表（需要 matplotlib）
+portfolio.generate_charts('output_dir')
 ```
 
-3. 使用市場工具：
-```python
-from stock_tracker.utils import is_market_open, format_market_hours
-
-# 檢查市場是否開盤
-if is_market_open('NASDAQ'):
-    print("美股市場開盤中")
-
-# 顯示市場交易時間
-print(f"美股交易時間: {format_market_hours('NASDAQ')}")
-```
-
-## 檔案結構說明
+## 資料夾結構
 
 ```
 stock_tracker/
@@ -200,31 +240,6 @@ REQUEST_TIMEOUT=10
 MAX_RETRIES=3
 ```
 
-## 開發指南
-
-### 自定義開發
-
-1. 添加新的數據來源：
-```python
-# scraper/custom_source.py
-def get_stock_price_from_custom(symbol: str) -> dict:
-    # 實作自定義數據來源
-    pass
-```
-
-2. 擴展市場支援：
-```python
-# constants.py
-MARKET_HOURS['NEW_MARKET'] = {
-    'timezone': 'Asia/Tokyo',
-    'trading_days': range(0, 5),
-    'trading_hours': {
-        'start': time(9, 0),
-        'end': time(15, 30)
-    }
-}
-```
-
 ## 交易時間管理
 
 ### 台灣股市（TPE/TWO）
@@ -238,21 +253,6 @@ MARKET_HOURS['NEW_MARKET'] = {
 - 自動根據日期判斷夏令/冬令時間
 - 跨日交易自動處理
 
-## 數據來源
-
-### Google Finance
-- 主要數據來源
-- 支援：
-  - 大多數股票的即時報價
-  - 即時匯率資訊
-  - 主要市場指數
-
-### Yahoo Finance 台灣
-- 備用數據來源
-- 特別支援：
-  - 台灣櫃買市場特殊股票代碼
-  - 當 Google Finance 無法取得資料時自動切換
-
 ## 支援的交易所
 
 - NASDAQ: 納斯達克（例如：TSLA:NASDAQ）
@@ -260,13 +260,6 @@ MARKET_HOURS['NEW_MARKET'] = {
 - NYSEARCA: NYSE Arca（例如：VTI:NYSEARCA）
 - TPE: 台灣證券交易所（例如：2330:TPE）
 - TWO: 台灣櫃買中心（例如：00687B.TWO）
-
-## 匯率轉換
-
-- 自動從 Google Finance 獲取 USD-TWD 即時匯率
-- 匯率顯示至小數點後兩位
-- 自動轉換美股價格至新台幣
-- 每次更新價格時自動更新匯率
 
 ## 開發指南
 
@@ -296,7 +289,18 @@ pytest tests/
 - 美股時間會自動根據夏令/冬令時間調整
 - 可以使用 `format_market_hours()` 查看當前交易時間
 
+### 4. 圖表顯示問題
+- 確認已安裝 matplotlib
+- 檢查中文字體是否正確安裝
+- 確保輸出目錄具有寫入權限
+
 ## 更新記錄
+
+### v0.1.3 (2024-10-25)
+- 新增投資組合視覺化圖表功能
+- 支援繁體中文圖表顯示
+- 改進錯誤處理和日誌記錄
+- 優化命令列介面
 
 ### v0.1.2
 - 新增自動判斷夏令/冬令時間功能
