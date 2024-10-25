@@ -20,7 +20,7 @@ python-dotenv==1.0.1
 pytz==2024.2
 requests==2.32.3
 soupsieve==2.6
-# Editable install with no version control (stock_tracker==0.1.0)
+# Editable Git install with no remote (stock_tracker==0.1.0)
 tzdata==2024.2
 urllib3==2.2.3
 wcwidth==0.2.13
