@@ -1,29 +1,60 @@
 import json
 from datetime import datetime
 import pytz
+import logging
 from prettytable import PrettyTable, PLAIN_COLUMNS
-from stock_tracker.scraper.finance_scraper import get_multiple_stock_prices
-from stock_tracker.scraper.exchange_rate_scraper import get_exchange_rate
-from stock_tracker.utils.market_utils import (
+from ..scraper.finance_scraper import get_multiple_stock_prices
+from ..scraper.exchange_rate_scraper import get_exchange_rate
+from ..utils.market_utils import (
     should_update_price,
     get_market_from_symbol,
     format_market_hours,
     is_market_open
 )
-from stock_tracker.utils.time_utils import get_current_timestamp
+from ..utils.time_utils import get_current_timestamp
+
+logger = logging.getLogger(__name__)
 
 class PortfolioManager:
-    def __init__(self, file_path='portfolio.json'):
+    def __init__(self, file_path='portfolio.json', gist_manager=None):
         self.file_path = file_path
+        self.gist_manager = gist_manager
         self.portfolio = self._load_portfolio()
         
     def _load_portfolio(self):
-        with open(self.file_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
+        """優先從 Gist 讀取，如果失敗則從本地讀取"""
+        if self.gist_manager:
+            portfolio_data = self.gist_manager.read_portfolio()
+            if portfolio_data:
+                logger.info("從 Gist 成功載入投資組合")
+                return portfolio_data
+        
+        try:
+            with open(self.file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                logger.info("從本地檔案載入投資組合")
+                return data
+        except Exception as e:
+            logger.error(f"讀取本地檔案失敗: {str(e)}")
+            raise
             
     def _save_portfolio(self):
-        with open(self.file_path, 'w', encoding='utf-8') as f:
-            json.dump(self.portfolio, f, indent=2, ensure_ascii=False)
+        """同時更新 Gist 和本地檔案"""
+        # 更新 Gist
+        if self.gist_manager:
+            success = self.gist_manager.update_portfolio(self.portfolio)
+            if success:
+                # 建立備份
+                self.gist_manager.create_backup(self.portfolio)
+        
+        # 更新本地檔案
+        try:
+            with open(self.file_path, 'w', encoding='utf-8') as f:
+                json.dump(self.portfolio, f, indent=2, ensure_ascii=False)
+            logger.info("已更新本地投資組合檔案")
+        except Exception as e:
+            logger.error(f"儲存本地檔案失敗: {str(e)}")
+            raise
     
     def update_exchange_rate(self):
         try:
