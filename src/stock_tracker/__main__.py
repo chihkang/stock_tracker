@@ -14,24 +14,35 @@ def setup_logging():
     
     log_file = log_dir / f"stocktracker_{datetime.now().strftime('%Y%m%d')}.log"
     
+    # 設定 root logger
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers=[
             logging.FileHandler(log_file, encoding='utf-8'),
-            logging.StreamHandler()
+            logging.StreamHandler(sys.stdout)  # 輸出到 stdout
         ]
     )
-    return logging.getLogger(__name__)
+    
+    logger = logging.getLogger(__name__)
+    return logger
 
 @error_handler
 def main():
     parser = argparse.ArgumentParser(description='股票投資組合管理工具')
     parser.add_argument('command', choices=['portfolio'], help='執行的命令')
     parser.add_argument('--file', default='portfolio.json', help='投資組合檔案路徑')
+    parser.add_argument('--debug', action='store_true', help='啟用除錯模式')
     
     args = parser.parse_args()
     logger = setup_logging()
+    
+    if args.debug:
+        logger.setLevel(logging.DEBUG)
+        logger.debug("Debug mode enabled")
+        logger.debug(f"Current working directory: {os.getcwd()}")
+        logger.debug(f"GIST_ID environment variable: {'set' if os.environ.get('GIST_ID') else 'not set'}")
+        logger.debug(f"GIST_TOKEN environment variable: {'set' if os.environ.get('GIST_TOKEN') else 'not set'}")
     
     if args.command == 'portfolio':
         # 檢查環境變數
@@ -40,13 +51,18 @@ def main():
         
         if gist_id and gist_token:
             logger.info("使用 Gist 模式")
-            gist_manager = GistManager(gist_id, gist_token)
-            portfolio_manager = PortfolioManager(file_path=args.file, gist_manager=gist_manager)
+            try:
+                gist_manager = GistManager(gist_id, gist_token)
+                portfolio_manager = PortfolioManager(file_path=args.file, gist_manager=gist_manager)
+                logger.info("成功初始化 GistManager 和 PortfolioManager")
+            except Exception as e:
+                logger.error(f"初始化 Gist 管理器失敗: {str(e)}")
+                raise
         else:
-            # 檢查本地文件是否存在
-            if not os.path.exists(args.file):
-                raise FileNotFoundError(f"找不到必要的配置文件: {args.file}")
             logger.info("使用本地檔案模式")
+            if not os.path.exists(args.file):
+                logger.error(f"找不到檔案: {args.file}")
+                raise FileNotFoundError(f"找不到必要的配置文件: {args.file}")
             portfolio_manager = PortfolioManager(file_path=args.file)
         
         portfolio_manager.update_prices()

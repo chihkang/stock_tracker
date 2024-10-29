@@ -36,15 +36,37 @@ jobs:
         pip install -r requirements.txt
         pip install -e .
         
+    - name: Check environment
+      run: |
+        echo "Checking environment variables..."
+        if [ -n "$GIST_ID" ]; then
+          echo "GIST_ID is set"
+        else
+          echo "GIST_ID is not set"
+        fi
+        if [ -n "$GIST_TOKEN" ]; then
+          echo "GIST_TOKEN is set"
+        else
+          echo "GIST_TOKEN is not set"
+        fi
+        echo "Current directory: $(pwd)"
+        echo "Directory contents:"
+        ls -la
+        
     - name: Update portfolio
-      run: python -m stock_tracker portfolio
+      run: |
+        echo "Starting portfolio update..."
+        python -m stock_tracker portfolio --debug
       env:
         GIST_ID: ${{ secrets.GIST_ID }}
         GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+        PYTHONPATH: ${{ github.workspace }}/src
         
     - name: Upload logs
       if: always()
       uses: actions/upload-artifact@v3
       with:
         name: portfolio-logs
-        path: logs/*.log
+        path: |
+          logs/*.log
+          *.log
