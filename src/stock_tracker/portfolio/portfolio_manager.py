@@ -24,19 +24,32 @@ class PortfolioManager:
     def _load_portfolio(self):
         """優先從 Gist 讀取，如果失敗則從本地讀取"""
         if self.gist_manager:
+            logger.info("嘗試從 Gist 讀取投資組合")
             portfolio_data = self.gist_manager.read_portfolio()
             if portfolio_data:
                 logger.info("從 Gist 成功載入投資組合")
+                # 同時保存一份到本地
+                try:
+                    with open(self.file_path, 'w', encoding='utf-8') as f:
+                        json.dump(portfolio_data, f, indent=2, ensure_ascii=False)
+                    logger.info("已將 Gist 資料同步到本地")
+                except Exception as e:
+                    logger.warning(f"同步到本地失敗: {str(e)}")
                 return portfolio_data
+            else:
+                logger.error("從 Gist 讀取失敗")
+                raise FileNotFoundError("無法從 Gist 讀取投資組合資料")
         
+        # 如果沒有 Gist 管理器或 Gist 讀取失敗，嘗試讀取本地檔案
         try:
+            logger.info("嘗試從本地檔案讀取投資組合")
             with open(self.file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                logger.info("從本地檔案載入投資組合")
+                logger.info("從本地檔案成功載入投資組合")
                 return data
         except Exception as e:
             logger.error(f"讀取本地檔案失敗: {str(e)}")
-            raise
+            raise FileNotFoundError(f"無法讀取投資組合資料: {str(e)}")
             
     def _save_portfolio(self):
         """同時更新 Gist 和本地檔案"""
