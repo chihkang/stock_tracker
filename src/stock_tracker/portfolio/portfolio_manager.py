@@ -180,8 +180,14 @@ class PortfolioManager:
         separator = "=" * table_width
         divider = "-" * table_width
         
+        # Get current time in Taipei timezone
+        taipei_tz = pytz.timezone('Asia/Taipei')
+        current_time = datetime.now(taipei_tz)
+        formatted_time = current_time.strftime('%Y/%m/%d %H:%M')
+        
         print("\n投資組合摘要:")
         print(separator)
+        print(f"日期時間: {formatted_time}")
         print(f"總價值: TWD {self.portfolio['totalValue']:,.2f}")
         print(f"匯率: {self.portfolio['exchange rate']} TWD/USD")
         print(divider)
