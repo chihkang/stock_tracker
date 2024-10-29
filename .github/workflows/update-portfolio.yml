@@ -25,6 +25,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
+        pip install prettytable requests pytz
         pip install -e .
         
     - name: Update portfolio
