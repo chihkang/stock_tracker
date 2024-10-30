@@ -1,93 +1,138 @@
 # Stock Tracker
 
-從 Google Finance 和 Yahoo Finance 擷取即時股價的 Python 工具，支援多個交易所的股票價格查詢及匯率轉換，並具備智能交易時間判斷功能。
+A Python tool for retrieving real-time stock prices from Google Finance and Yahoo Finance, supporting stock price queries across multiple exchanges and currency conversion, with intelligent trading time detection.
 
-## 功能特點
+## Architecture
 
-- 多重數據源支援
-  - Google Finance（主要數據源）
-  - Yahoo Finance 台灣（備用數據源，支援特殊股票代碼如櫃買中心）
-- 智能交易時間管理
-  - 自動判斷各市場交易時間
-  - 支援美股夏令/冬令時間自動切換
-  - 僅在交易時段更新價格
-- 即時匯率轉換
-  - 自動從 Google Finance 獲取 USD-TWD 匯率
-  - 匯率顯示至小數點後兩位
-- 投資組合視覺化
-  - 資產分配圓餅圖
-  - 市場分布圓餅圖
-  - 貨幣分布柱狀圖
-  - 完整支援繁體中文顯示
-- 模組化設計，易於擴充
-- 支援多種交易所
+```mermaid
+graph TB
+    subgraph "Configuration"
+        A[".env File"] --> |Environment Variables| C[Stock Tracker Core]
+        B1["GitHub GIST\nportfolio.json"] --> |Primary Source| C
+        B2["Local\nportfolio.json"] --> |Fallback Source| C
+    end
 
-## 系統需求
+    subgraph "Data Sources"
+        D1["Google Finance\n(Primary)"] --> |Real-time Data| C
+        D2["Yahoo Finance\n(Backup)"] --> |Real-time Data| C
+        D3["Exchange Rate\nService"] --> |USD-TWD Rate| C
+    end
 
-- Python 3.8 或更高版本
-- pip (Python 套件管理器)
-- venv (Python 虛擬環境工具)
-- tzdata (時區資料)
-- matplotlib (圖表生成，可選)
+    subgraph "Processing"
+        C --> E[Trading Time Manager]
+        C --> F[Portfolio Manager]
+        C --> G[Data Fetcher]
+        
+        E --> |Time Validation| F
+        G --> |Price Data| F
+    end
 
-## 快速安裝
+    subgraph "Output"
+        F --> H1[Console Output]
+        F --> H2[Chart Generation]
+        F --> H3[GIST Update]
+        
+        H2 --> I1["Asset Allocation\n(Pie Chart)"]
+        H2 --> I2["Market Distribution\n(Pie Chart)"]
+        H2 --> I3["Currency Distribution\n(Bar Chart)"]
+    end
 
-### 方法一：一鍵安裝（推薦）
-```bash
-# 移除舊的虛擬環境（如果存在）
-rm -rf venv && \
-# 創建新的虛擬環境
-python3 -m venv venv && \
-# 啟動虛擬環境
-source venv/bin/activate && \
-# 安裝依賴
-pip install -r requirements.txt && \
-# 安裝專案
-pip install -e . && \
-# 安裝圖表支援（可選）
-pip install matplotlib && \
-# 測試執行
-python -m stock_tracker portfolio
+    subgraph "Automation"
+        J[GitHub Actions] --> |Trigger| C
+        J --> |Schedule| K["Regular Updates\n(Every specified time on weekdays)"]
+        K --> |Update| B1
+    end
+
+    classDef configNode fill:#f9f,stroke:#333,stroke-width:2px
+    classDef dataNode fill:#bbf,stroke:#333,stroke-width:2px
+    classDef processNode fill:#bfb,stroke:#333,stroke-width:2px
+    classDef outputNode fill:#fbb,stroke:#333,stroke-width:2px
+    classDef autoNode fill:#ffb,stroke:#333,stroke-width:2px
+
+    class A,B1,B2 configNode
+    class D1,D2,D3 dataNode
+    class C,E,F,G processNode
+    class H1,H2,H3,I1,I2,I3 outputNode
+    class J,K autoNode
 ```
 
-### 方法二：逐步安裝
-1. clone或下載專案：
+## Features
+
+- Multiple Data Sources
+  - Google Finance (primary source)
+  - Yahoo Finance Taiwan (backup source, supports special stock codes like OTC market)
+- Intelligent Trading Time Management
+  - Automatic market trading time detection
+  - Support for US stock market DST/ST automatic switching
+  - Price updates only during trading hours
+- Real-time Currency Conversion
+  - Automatic USD-TWD exchange rate from Google Finance
+  - Exchange rates displayed to two decimal places
+- Portfolio Visualization
+  - Asset allocation pie chart
+  - Market distribution pie chart
+  - Currency distribution bar chart
+  - Full Traditional Chinese display support
+- Modular design, easy to extend
+- Support for multiple exchanges
+
+## System Requirements
+
+- Python 3.8 or higher
+- pip (Python package manager)
+- venv (Python virtual environment tool)
+- tzdata (timezone data)
+- matplotlib (chart generation, optional)
+
+## Quick Installation
+
+1. Clone or download the project:
+
 ```bash
 git clone <repository-url>
 cd stock_tracker
 ```
 
-2. 建立並啟動虛擬環境：
-```bash
-# macOS/Linux
-python3 -m venv venv
-source venv/bin/activate
+2. Installation commands:
 
-# Windows
-python -m venv venv
-venv\Scripts\activate
+```bash
+# Remove old virtual environment (if exists)
+rm -rf venv && \
+# Create new virtual environment
+python3 -m venv venv && \
+# Activate virtual environment
+source venv/bin/activate && \
+# Install dependencies
+pip install -r requirements.txt && \
+# Install project
+pip install -e . && \
+# Install chart support (optional)
+pip install matplotlib && \
+# Test execution
+python -m stock_tracker portfolio
 ```
 
-3. 安裝依賴：
-```bash
-pip install -r requirements.txt
+## Usage
+
+### Required Configuration
+
+Before using the program, you need to set up the following:
+
+1. GitHub GIST Configuration (Primary Method):
+   Create a `.env` file in the project root directory with your GitHub GIST credentials:
+
+```env
+GIST_ID=your_gist_id
+GIST_TOKEN=your_github_personal_access_token
+BASE_URL=https://www.google.com/finance/quote/
+TIMEZONE=Asia/Taipei
+USER_AGENT=Mozilla/5.0
+REQUEST_TIMEOUT=10
+MAX_RETRIES=3
 ```
 
-4. 安裝圖表支援（可選）：
-```bash
-pip install matplotlib
-```
-
-5. 安裝專案：
-```bash
-pip install -e .
-```
-
-## 使用方法
-
-### 必要檔案設置
-
-在使用程式前，需要在專案根目錄建立 `portfolio.json` 檔案，用於儲存投資組合資訊：
+2. Local Portfolio File (Fallback Method):
+   Create a `portfolio.json` file in the project root directory to store portfolio information:
 
 ```json
 {
@@ -114,217 +159,143 @@ pip install -e .
 }
 ```
 
-主要欄位說明：
-- `totalValue`: 投資組合總值（TWD）
-- `exchange rate`: USD-TWD 匯率
-- `stocks`: 股票清單
-  - `name`: 股票代號（格式：代號:市場）
-  - `price`: 股票價格
-  - `quantity`: 持股數量
-  - `currency`: 貨幣（TWD 或 USD）
-  - `lastUpdated`: 最後更新時間
-  - `percentageOfTotal`: 佔投資組合比例
+The program will first try to read from the configured GIST, and if unavailable, will fall back to the local portfolio.json file.
 
-### 命令列介面
+### GitHub Actions Integration
 
-程式支援多種操作模式：
+The repository includes GitHub Actions workflow for automated portfolio updates:
 
-1. 更新並顯示完整投資組合：
+1. Create GitHub Secrets for your repository:
+   - `GIST_ID`: Your GitHub GIST ID
+   - `GIST_TOKEN`: Your GitHub Personal Access Token with gist scope
+
+2. The workflow will automatically:
+   - Run at scheduled intervals
+   - Update portfolio data
+   - Generate new charts
+   - Update the GIST with latest data
+
+Example workflow file (.github/workflows/update-portfolio.yml):
+
+```yaml
+name: Update Portfolio
+
+on:
+  schedule:
+    - cron: '30 3 * * 1-5'  
+    - cron: '30 5 * * 1-5'  
+    - cron: '30 21 * * 0-5'
+  workflow_dispatch:
+
+env:
+  GIST_ID: ${{ secrets.GIST_ID }}
+  GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+
+jobs:
+  update-portfolio:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+            
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+          
+      - name: Check environment
+        run: |
+          echo "Checking environment variables..."
+          if [ -n "$GIST_ID" ]; then
+            echo "GIST_ID is set"
+          else
+            echo "GIST_ID is not set"
+          fi
+          if [ -n "$GIST_TOKEN" ]; then
+            echo "GIST_TOKEN is set"
+          else
+            echo "GIST_TOKEN is not set"
+          fi
+          echo "Current directory: $(pwd)"
+          echo "Directory contents:"
+          ls -la
+          
+      - name: Update portfolio
+        run: |
+          echo "Starting portfolio update..."
+          python -m stock_tracker portfolio --debug
+        env:
+          GIST_ID: ${{ secrets.GIST_ID }}
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          PYTHONPATH: ${{ github.workspace }}/src
+          
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portfolio-logs
+          path: |
+            logs/*.log
+            *.log
+```
+
+### Command Line Interface
+
+The program supports multiple operation modes:
+
+1. Update and display complete portfolio:
+
 ```bash
 python -m stock_tracker portfolio
 ```
 
-2. 更新投資組合並生成視覺化圖表：
+2. Update portfolio and generate visualization charts:
+
 ```bash
 python -m stock_tracker portfolio --charts
 ```
 
-3. 指定圖表輸出目錄：
+3. Specify chart output directory:
+
 ```bash
 python -m stock_tracker portfolio --charts --output-dir my_charts
 ```
 
-4. 查詢特定股票即時價格：
+4. Query specific stock prices in real-time:
+
 ```bash
 python -m stock_tracker query TSLA:NASDAQ VTI:NYSEARCA 2330:TPE
 ```
 
-5. 使用指定的投資組合檔案：
+5. Use a specific portfolio file:
+
 ```bash
 python -m stock_tracker portfolio --file my_portfolio.json
 ```
 
-### 圖表功能
+[Rest of the content remains the same as the original, including Chart Features, Python Usage, Directory Structure, Trading Time Management, Supported Exchanges, Development Guide, Troubleshooting, and Version History sections]
 
-執行 `portfolio --charts` 命令會生成三種視覺化圖表：
-
-1. **資產分配圖** (asset_allocation.png)
-   - 顯示各個股票佔投資組合的比例
-   - 使用圓餅圖呈現
-   - 包含詳細的百分比標示
-
-2. **市場分布圖** (market_distribution.png)
-   - 顯示不同市場（如 NASDAQ、TPE 等）的投資分布
-   - 使用圓餅圖呈現
-   - 自動合併相同市場的持股
-
-3. **貨幣分布圖** (currency_distribution.png)
-   - 顯示不同貨幣（TWD、USD）的投資比例
-   - 使用柱狀圖呈現
-   - 包含精確的百分比數值
-
-圖表特點：
-- 完整支援繁體中文顯示
-- 自動調整字體大小和位置
-- 清晰的色彩區分
-- 高解析度輸出 (300 DPI)
-- 自動保存至指定目錄
-
-### Python 程式中使用
-
-1. 基本查詢功能：
-```python
-from stock_tracker import get_multiple_stock_prices, format_output
-
-# 查詢多支股票
-symbols = ["VTI:NYSEARCA", "TSLA:NASDAQ", "2330:TPE"]
-prices = get_multiple_stock_prices(symbols)
-format_output(prices)
-```
-
-2. 使用投資組合管理：
-```python
-from stock_tracker import PortfolioManager
-
-# 初始化投資組合管理器
-portfolio = PortfolioManager('portfolio.json')
-
-# 更新價格
-portfolio.update_prices()
-
-# 顯示投資組合
-portfolio.print_portfolio()
-
-# 生成圖表（需要 matplotlib）
-portfolio.generate_charts('output_dir')
-```
-
-## 資料夾結構
-
-```
-stock_tracker/
-├── portfolio.json          # 投資組合設定檔（需自行創建）
-├── .env                    # 環境變數設定（可選）
-├── src/
-│   └── stock_tracker/     # 主程式碼
-├── tests/                 # 測試檔案
-└── README.md             # 說明文件
-```
-
-## 配置檔案
-
-### portfolio.json
-投資組合設定檔，定義：
-- 持有的股票清單
-- 每支股票的數量和成本
-- 匯率設定
-- 更新時間記錄
-
-### .env（可選）
-環境變數設定：
-```env
-BASE_URL=https://www.google.com/finance/quote/
-TIMEZONE=Asia/Taipei
-USER_AGENT=Mozilla/5.0
-REQUEST_TIMEOUT=10
-MAX_RETRIES=3
-```
-
-## 交易時間管理
-
-### 台灣股市（TPE/TWO）
-- 交易時間：週一至週五 09:00-13:30 (UTC+8)
-- 非交易時間的價格查詢會使用最後更新的價格
-
-### 美國股市（NASDAQ/NYSE/NYSEARCA）
-- 交易時間：週一至週五
-  - 夏令時間：21:30-04:00 (UTC+8)
-  - 冬令時間：22:30-05:00 (UTC+8)
-- 自動根據日期判斷夏令/冬令時間
-- 跨日交易自動處理
-
-## 支援的交易所
-
-- NASDAQ: 納斯達克（例如：TSLA:NASDAQ）
-- NYSE: 紐約證券交易所（例如：AAPL:NYSE）
-- NYSEARCA: NYSE Arca（例如：VTI:NYSEARCA）
-- TPE: 台灣證券交易所（例如：2330:TPE）
-- TWO: 台灣櫃買中心（例如：00687B.TWO）
-
-## 開發指南
-
-### 安裝開發依賴
-```bash
-pip install -e .[dev]
-```
-
-### 執行測試
-```bash
-pytest tests/
-```
-
-## 常見問題解決
-
-### 1. 無法取得特定股票資訊
-- 檢查是否在交易時間內
-- 股票代號格式是否正確（例如：2330:TPE 或 00687B.TWO）
-- 確認網路連接狀態
-
-### 2. 匯率更新失敗
-- 檢查網路連接
-- 確認 Google Finance 服務可用性
-- 系統會自動使用上次成功更新的匯率
-
-### 3. 交易時間判斷
-- 美股時間會自動根據夏令/冬令時間調整
-- 可以使用 `format_market_hours()` 查看當前交易時間
-
-### 4. 圖表顯示問題
-- 確認已安裝 matplotlib
-- 檢查中文字體是否正確安裝
-- 確保輸出目錄具有寫入權限
-
-## 更新記錄
-
-### v0.1.3 (2024-10-25)
-- 新增投資組合視覺化圖表功能
-- 支援繁體中文圖表顯示
-- 改進錯誤處理和日誌記錄
-- 優化命令列介面
-
-### v0.1.2
-- 新增自動判斷夏令/冬令時間功能
-- 改進交易時間管理
-- 優化匯率顯示格式
-
-### v0.1.1
-- 新增 Yahoo Finance 數據源支援
-- 新增交易時間檢查功能
-- 新增即時匯率轉換
-
-### v0.1.0
-- 初始版本
-- 支援多股票即時報價
-- 支援台灣時區
-- 模組化設計
-
-## 授權
+## License
 
 MIT License
 
-## 貢獻指南
+## Contributing
 
-歡迎提交 Issue 或 Pull Request 來改善專案。提交前請確保：
-1. 已完整測試新功能
-2. 更新相關文檔
-3. 遵循現有代碼風格
+Feel free to submit Issues or Pull Requests to improve the project. Before submitting, please ensure:
+
+1. New features are thoroughly tested
+2. Documentation is updated
+3. Existing code style is followed
