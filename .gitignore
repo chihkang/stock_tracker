@@ -58,3 +58,5 @@ instance/
 
 # Costomer files
 portfolio.json
+.DS_Store.DS_Store
+**/.DS_Store
