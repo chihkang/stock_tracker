@@ -1,6 +1,35 @@
 import requests
 from bs4 import BeautifulSoup
 from ..exceptions import ScraperError
+import asyncio
+from ..exceptions import ScraperError
+from ..api import get_api_client
+
+async def update_exchange_rate(currency_pair='USD-TWD'):
+    """
+    從 Google Finance 獲取匯率並更新到 API
+    
+    Args:
+        currency_pair: 貨幣對，例如 'USD-TWD'
+    
+    Returns:
+        float: 匯率（四捨五入到小數點後兩位）
+    """
+    try:
+        # 獲取匯率
+        rate = get_exchange_rate(currency_pair)
+        
+        # 更新到 API
+        api_client = get_api_client()
+        success = await api_client.update_exchange_rate(rate)
+        
+        if not success:
+            logger.warning("匯率更新到 API 失敗")
+            
+        return rate
+            
+    except Exception as e:
+        raise ScraperError(f"獲取匯率時發生錯誤: {str(e)}")
 
 def get_exchange_rate(currency_pair='USD-TWD'):
     """

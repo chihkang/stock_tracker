@@ -1,6 +1,11 @@
-import requests
+# src/stock_tracker/gist_utils.py
+import aiohttp
 import json
 import os
+import logging
+from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 class GistManager:
     def __init__(self, gist_id, token):
@@ -11,20 +16,23 @@ class GistManager:
         }
         self.base_url = f'https://api.github.com/gists/{gist_id}'
 
-    def read_portfolio(self):
+    async def read_portfolio(self):
         """從 Gist 讀取 portfolio.json"""
         try:
-            response = requests.get(self.base_url, headers=self.headers)
-            response.raise_for_status()
-            
-            gist_data = response.json()
-            portfolio_content = gist_data['files']['portfolio.json']['content']
-            return json.loads(portfolio_content)
+            async with aiohttp.ClientSession(headers=self.headers) as session:
+                async with session.get(self.base_url) as response:
+                    if response.status == 200:
+                        gist_data = await response.json()
+                        portfolio_content = gist_data['files']['portfolio.json']['content']
+                        return json.loads(portfolio_content)
+                    else:
+                        logger.error(f"從 Gist 讀取失敗: {response.status}")
+                        return None
         except Exception as e:
-            print(f"從 Gist 讀取失敗: {str(e)}")
+            logger.error(f"從 Gist 讀取失敗: {str(e)}")
             return None
 
-    def update_portfolio(self, portfolio_data):
+    async def update_portfolio(self, portfolio_data):
         """更新 Gist 中的 portfolio.json"""
         try:
             payload = {
@@ -35,31 +43,34 @@ class GistManager:
                 }
             }
             
-            response = requests.patch(self.base_url, headers=self.headers, json=payload)
-            response.raise_for_status()
-            
-            print("已成功更新 Gist 中的 portfolio.json")
-            return True
+            async with aiohttp.ClientSession(headers=self.headers) as session:
+                async with session.patch(self.base_url, json=payload) as response:
+                    if response.status == 200:
+                        logger.info("已成功更新 Gist 中的 portfolio.json")
+                        return True
+                    else:
+                        response_text = await response.text()
+                        logger.error(f"更新 Gist 失敗: {response.status}, {response_text}")
+                        return False
         except Exception as e:
-            print(f"更新 Gist 失敗: {str(e)}")
+            logger.error(f"更新 Gist 失敗: {str(e)}")
             return False
 
-    @staticmethod
-    def create_backup(portfolio_data, backup_dir='backups'):
+    async def create_backup(self, portfolio_data, backup_dir='backups'):
         """建立本地備份"""
         try:
             if not os.path.exists(backup_dir):
                 os.makedirs(backup_dir)
             
-            from datetime import datetime
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             backup_file = os.path.join(backup_dir, f'portfolio_{timestamp}.json')
             
+            # 寫入檔案操作不需要非同步，因為是本地操作
             with open(backup_file, 'w', encoding='utf-8') as f:
                 json.dump(portfolio_data, f, indent=2, ensure_ascii=False)
             
-            print(f"已建立備份: {backup_file}")
+            logger.info(f"已建立備份: {backup_file}")
             return True
         except Exception as e:
-            print(f"建立備份失敗: {str(e)}")
+            logger.error(f"建立備份失敗: {str(e)}")
             return False

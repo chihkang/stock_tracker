@@ -1,7 +1,9 @@
+# src/stock_tracker/__main__.py
 import os
 import sys
 import argparse
 import logging
+import asyncio
 from pathlib import Path
 from datetime import datetime
 from .gist_utils import GistManager
@@ -28,7 +30,7 @@ def setup_logging():
     return logger
 
 @error_handler
-def main():
+async def async_main():
     parser = argparse.ArgumentParser(description='股票投資組合管理工具')
     parser.add_argument('command', choices=['portfolio'], help='執行的命令')
     parser.add_argument('--file', default='portfolio.json', help='投資組合檔案路徑')
@@ -54,6 +56,7 @@ def main():
             try:
                 gist_manager = GistManager(gist_id, gist_token)
                 portfolio_manager = PortfolioManager(file_path=args.file, gist_manager=gist_manager)
+                await portfolio_manager.initialize()
                 logger.info("成功初始化 GistManager 和 PortfolioManager")
             except Exception as e:
                 logger.error(f"初始化 Gist 管理器失敗: {str(e)}")
@@ -64,11 +67,16 @@ def main():
                 logger.error(f"找不到檔案: {args.file}")
                 raise FileNotFoundError(f"找不到必要的配置文件: {args.file}")
             portfolio_manager = PortfolioManager(file_path=args.file)
-        
-        portfolio_manager.update_prices()
+            await portfolio_manager.initialize()
+        # 使用 await 調用非同步方法
+        await portfolio_manager.update_prices()
         portfolio_manager.print_portfolio()
         
     return 0
+
+def main():
+    """同步入口點，用於執行非同步主函數"""
+    return asyncio.run(async_main())
 
 if __name__ == '__main__':
     sys.exit(main())

@@ -1,3 +1,4 @@
+# src/stock_tracker/config.py
 import os
 import logging
 from logging.handlers import RotatingFileHandler
@@ -8,6 +9,7 @@ from dotenv import load_dotenv
 @dataclass
 class Config:
     """應用程式配置類別"""
+    # 原有設定
     BASE_URL: str = "https://www.google.com/finance/quote/"
     USER_AGENT: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     TIMEZONE: str = "Asia/Taipei"
@@ -15,6 +17,14 @@ class Config:
     LOG_DIR: str = "logs"
     LOG_MAX_BYTES: int = 10 * 1024 * 1024  # 10MB
     LOG_BACKUP_COUNT: int = 5
+    
+    # 新增 API 相關設定
+    PORTFOLIO_API_URL: str = "http://localhost:5000"
+    PORTFOLIO_API_KEY: str | None = None
+    
+    # MongoDB 設定 (如果需要)
+    MONGODB_URL: str = "mongodb://localhost:27017"
+    MONGODB_DB_NAME: str = "stock_tracker"
 
 def setup_logging(config: Config) -> logging.Logger:
     """
@@ -38,6 +48,9 @@ def setup_logging(config: Config) -> logging.Logger:
     logging.getLogger('urllib3').setLevel(logging.WARNING)
     logging.getLogger('matplotlib').setLevel(logging.WARNING)
     logging.getLogger('PIL').setLevel(logging.WARNING)
+    
+    # 新增：設定 aiohttp 的日誌層級
+    logging.getLogger('aiohttp').setLevel(logging.WARNING)
 
     # 配置控制台處理器
     console_handler = logging.StreamHandler()
@@ -85,6 +98,7 @@ def get_config() -> Config:
     load_dotenv()
     
     return Config(
+        # 原有設定
         BASE_URL=os.getenv("BASE_URL", Config.BASE_URL),
         USER_AGENT=os.getenv("USER_AGENT", Config.USER_AGENT),
         TIMEZONE=os.getenv("TIMEZONE", Config.TIMEZONE),
@@ -92,6 +106,14 @@ def get_config() -> Config:
         LOG_DIR=os.getenv("LOG_DIR", Config.LOG_DIR),
         LOG_MAX_BYTES=int(os.getenv("LOG_MAX_BYTES", Config.LOG_MAX_BYTES)),
         LOG_BACKUP_COUNT=int(os.getenv("LOG_BACKUP_COUNT", Config.LOG_BACKUP_COUNT)),
+        
+        # 新增 API 相關設定
+        PORTFOLIO_API_URL=os.getenv("PORTFOLIO_API_URL", Config.PORTFOLIO_API_URL),
+        PORTFOLIO_API_KEY=os.getenv("PORTFOLIO_API_KEY"),
+        
+        # MongoDB 設定 (如果需要)
+        MONGODB_URL=os.getenv("MONGODB_URL", Config.MONGODB_URL),
+        MONGODB_DB_NAME=os.getenv("MONGODB_DB_NAME", Config.MONGODB_DB_NAME),
     )
 
 # 初始化配置和日誌

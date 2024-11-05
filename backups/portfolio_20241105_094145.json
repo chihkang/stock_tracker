@@ -1,0 +1,71 @@
+{
+  "totalValue": 7504801.472860687,
+  "exchange rate": "31.96",
+  "stocks": [
+    {
+      "name": "006208:TPE",
+      "price": 113.15,
+      "quantity": 19809,
+      "currency": "TWD",
+      "lastUpdated": "2024-11-05T09:41:40.012839+08:00",
+      "percentageOfTotal": 29.87
+    },
+    {
+      "name": "00713:TPE",
+      "price": 56.5,
+      "quantity": 27671,
+      "currency": "TWD",
+      "lastUpdated": "2024-11-05T09:41:40.835604+08:00",
+      "percentageOfTotal": 20.83
+    },
+    {
+      "name": "00687B:TWO",
+      "price": 30.42,
+      "quantity": 20000,
+      "currency": "TWD",
+      "lastUpdated": "2024-11-05T09:41:42.459350+08:00",
+      "percentageOfTotal": 8.11
+    },
+    {
+      "name": "2330:TPE",
+      "price": 1045.0,
+      "quantity": 1000,
+      "currency": "TWD",
+      "lastUpdated": "2024-11-05T09:41:43.375959+08:00",
+      "percentageOfTotal": 13.92
+    },
+    {
+      "name": "2534:TPE",
+      "price": 25.45,
+      "quantity": 5000,
+      "currency": "TWD",
+      "lastUpdated": "2024-11-05T09:41:44.276044+08:00",
+      "percentageOfTotal": 1.7
+    },
+    {
+      "name": "TSLA:NASDAQ",
+      "price": 242.84,
+      "quantity": 95,
+      "currency": "USD",
+      "lastUpdated": "2024-11-05T05:33:11.786826+08:00",
+      "percentageOfTotal": 9.82
+    },
+    {
+      "name": "NVDA:NASDAQ",
+      "price": 136.05,
+      "quantity": 90,
+      "currency": "USD",
+      "lastUpdated": "2024-11-05T05:33:12.250849+08:00",
+      "percentageOfTotal": 5.21
+    },
+    {
+      "name": "VTI:NYSEARCA",
+      "price": 281.72,
+      "quantity": 87.81949,
+      "currency": "USD",
+      "lastUpdated": "2024-11-05T05:33:12.679332+08:00",
+      "percentageOfTotal": 10.54
+    }
+  ],
+  "exchange_rate_updated": "2024-11-05T09:41:39.587902+08:00"
+}

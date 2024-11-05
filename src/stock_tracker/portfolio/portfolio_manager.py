@@ -1,10 +1,14 @@
+# src/stock_tracker/portfolio/portfolio_manager.py
 import json
 from datetime import datetime
 import pytz
 import logging
+import asyncio
+from typing import Optional
 from prettytable import PrettyTable, PLAIN_COLUMNS
-from ..scraper.finance_scraper import get_multiple_stock_prices
-from ..scraper.exchange_rate_scraper import get_exchange_rate
+
+from ..scraper.finance_scraper import get_multiple_stock_prices, update_multiple_stock_prices
+from ..scraper.exchange_rate_scraper import get_exchange_rate, update_exchange_rate
 from ..utils.market_utils import (
     should_update_price,
     get_market_from_symbol,
@@ -12,6 +16,7 @@ from ..utils.market_utils import (
     is_market_open
 )
 from ..utils.time_utils import get_current_timestamp
+from ..api import get_api_client
 
 logger = logging.getLogger(__name__)
 
@@ -19,13 +24,19 @@ class PortfolioManager:
     def __init__(self, file_path='portfolio.json', gist_manager=None):
         self.file_path = file_path
         self.gist_manager = gist_manager
-        self.portfolio = self._load_portfolio()
+        self.portfolio = None  # 初始化時先設為 None
+        self.api_client = get_api_client()
+    
+    async def initialize(self):
+        """非同步初始化方法"""
+        self.portfolio = await self._load_portfolio()
+        return self
         
-    def _load_portfolio(self):
+    async def _load_portfolio(self):
         """優先從 Gist 讀取，如果失敗則從本地讀取"""
         if self.gist_manager:
             logger.info("嘗試從 Gist 讀取投資組合")
-            portfolio_data = self.gist_manager.read_portfolio()
+            portfolio_data = await self.gist_manager.read_portfolio()
             if portfolio_data:
                 logger.info("從 Gist 成功載入投資組合")
                 # 同時保存一份到本地
@@ -51,36 +62,57 @@ class PortfolioManager:
             logger.error(f"讀取本地檔案失敗: {str(e)}")
             raise FileNotFoundError(f"無法讀取投資組合資料: {str(e)}")
             
-    def _save_portfolio(self):
-        """同時更新 Gist 和本地檔案"""
-        # 更新 Gist
-        if self.gist_manager:
-            success = self.gist_manager.update_portfolio(self.portfolio)
-            if success:
-                # 建立備份
-                self.gist_manager.create_backup(self.portfolio)
-        
-        # 更新本地檔案
+    async def _save_portfolio(self):
+        """同時更新本地文件、Gist 和 API"""
         try:
+            # 更新本地檔案
             with open(self.file_path, 'w', encoding='utf-8') as f:
                 json.dump(self.portfolio, f, indent=2, ensure_ascii=False)
             logger.info("已更新本地投資組合檔案")
+            
+            # 更新 Gist（如果有設定）
+            if self.gist_manager:
+                success = await self.gist_manager.update_portfolio(self.portfolio)
+                if success:
+                    await self.gist_manager.create_backup(self.portfolio)
+            
+            # 更新到 API
+            try:
+                # 轉換資料格式以符合 API 期望
+                api_portfolio = {
+                    "totalValue": self.portfolio['totalValue'],
+                    "exchangeRate": float(self.portfolio['exchange rate']),
+                    "exchangeRateUpdated": self.portfolio['exchange_rate_updated'],
+                    "lastUpdated": get_current_timestamp(),
+                    "stocks": [{
+                        "stockId": stock['name'],
+                        "quantity": stock['quantity'],
+                        "percentageOfTotal": stock['percentageOfTotal']
+                    } for stock in self.portfolio['stocks']]
+                }                                
+                    
+            except Exception as e:
+                logger.error(f"更新 API 失敗: {str(e)}")
+                
         except Exception as e:
-            logger.error(f"儲存本地檔案失敗: {str(e)}")
+            logger.error(f"儲存投資組合失敗: {str(e)}")
             raise
     
-    def update_exchange_rate(self):
+    async def update_exchange_rate(self):
+        """更新匯率並同步到 API"""
         try:
-            new_rate = get_exchange_rate('USD-TWD')
+            # 使用新的非同步方法更新匯率
+            new_rate = await update_exchange_rate('USD-TWD')
             self.portfolio['exchange rate'] = f"{new_rate:.2f}"
             self.portfolio['exchange_rate_updated'] = get_current_timestamp()
             print(f"已更新匯率: {new_rate:.2f} TWD/USD")
             return new_rate
         except Exception as e:
-            print(f"更新匯率失敗: {str(e)}")
+            logger.error(f"更新匯率失敗: {str(e)}")
             return float(self.portfolio['exchange rate'])
     
     def _calculate_total_value(self):
+        """計算投資組合總值"""
         total_value_twd = 0
         exchange_rate = float(self.portfolio['exchange rate'])
         
@@ -92,8 +124,13 @@ class PortfolioManager:
         
         return total_value_twd
             
-    def update_prices(self):
-        self.update_exchange_rate()
+    async def update_prices(self):
+        """更新所有價格並同步到 API"""
+        # 確保已經初始化
+        if self.portfolio is None:
+            await self.initialize()
+            
+        await self.update_exchange_rate()
         
         symbols_to_update = []
         market_status = {}
@@ -105,44 +142,18 @@ class PortfolioManager:
             if market not in market_status:
                 market_status[market] = is_market_open(market)
         
-        print("\n市場狀態:")
-        for market, is_open in market_status.items():
-            trading_hours = format_market_hours(market)
-            if market in ['NASDAQ', 'NYSE', 'NYSEARCA']:
-                if is_open:
-                    print(f"{market}: {trading_hours} - 交易中")
-                else:
-                    print(f"{market}: {trading_hours} - 收盤中 (使用最新收盤價)")
-            else:
-                if is_open:
-                    print(f"{market}: {trading_hours} - 交易中")
-                else:
-                    print(f"{market}: {trading_hours} - 收盤中")
+        self._print_market_status(market_status)
         
         if not symbols_to_update:
             print("\n股票價格更新狀態:")
             print("- 美股已收盤，使用最新收盤價")
             print("- 台股無需更新")
             
-            total_value_twd = self._calculate_total_value()
-            if abs(total_value_twd - self.portfolio['totalValue']) > 0.01:
-                print("\n重新計算投資組合:")
-                print(f"- 原總值: TWD {self.portfolio['totalValue']:,.2f}")
-                print(f"- 新總值: TWD {total_value_twd:,.2f}")
-                
-                self.portfolio['totalValue'] = total_value_twd
-                exchange_rate = float(self.portfolio['exchange rate'])
-                for stock in self.portfolio['stocks']:
-                    value_twd = stock['price'] * stock['quantity']
-                    if stock['currency'] == 'USD':
-                        value_twd *= exchange_rate
-                    stock['percentageOfTotal'] = round((value_twd / total_value_twd) * 100, 2)
-                
-                self._save_portfolio()
-                print("- 已更新投資組合佔比")
+            await self._update_portfolio_calculations()
             return
             
-        prices = get_multiple_stock_prices(symbols_to_update)
+        # 使用新的非同步方法更新股票價格
+        prices = await update_multiple_stock_prices(symbols_to_update)
         
         update_count = 0
         us_stocks_count = 0
@@ -162,28 +173,59 @@ class PortfolioManager:
                     local_stocks_count += 1
         
         if update_count > 0 or local_stocks_count > 0:
-            total_value_twd = self._calculate_total_value()
-            old_total = self.portfolio['totalValue']
-            self.portfolio['totalValue'] = total_value_twd
+            await self._update_portfolio_calculations(
+                us_stocks_count=us_stocks_count,
+                local_stocks_count=local_stocks_count
+            )
+    
+    async def _update_portfolio_calculations(self, us_stocks_count=0, local_stocks_count=0):
+        """更新投資組合計算並同步到 API"""
+        total_value_twd = self._calculate_total_value()
+        old_total = self.portfolio['totalValue']
+        
+        if abs(total_value_twd - old_total) > 0.01:
+            print("\n重新計算投資組合:")
+            print(f"- 原總值: TWD {old_total:,.2f}")
+            print(f"- 新總值: TWD {total_value_twd:,.2f}")
             
+            self.portfolio['totalValue'] = total_value_twd
             exchange_rate = float(self.portfolio['exchange rate'])
+            
             for stock in self.portfolio['stocks']:
                 value_twd = stock['price'] * stock['quantity']
                 if stock['currency'] == 'USD':
                     value_twd *= exchange_rate
                 stock['percentageOfTotal'] = round((value_twd / total_value_twd) * 100, 2)
             
-            self._save_portfolio()
+            # 同步到本地和遠端
+            await self._save_portfolio()
             
-            print("\n更新統計:")
-            if us_stocks_count > 0:
-                print(f"- 更新了 {us_stocks_count} 支美股價格（收盤價）")
-            if local_stocks_count > 0:
-                print(f"- 更新了 {local_stocks_count} 支台股價格")
-            if abs(total_value_twd - old_total) > 0.01:
+            if us_stocks_count > 0 or local_stocks_count > 0:
+                print("\n更新統計:")
+                if us_stocks_count > 0:
+                    print(f"- 更新了 {us_stocks_count} 支美股價格（收盤價）")
+                if local_stocks_count > 0:
+                    print(f"- 更新了 {local_stocks_count} 支台股價格")
                 print(f"- 投資組合總值變動: TWD {old_total:,.2f} → TWD {total_value_twd:,.2f}")
     
+    def _print_market_status(self, market_status):
+        """打印市場狀態"""
+        print("\n市場狀態:")
+        for market, is_open in market_status.items():
+            trading_hours = format_market_hours(market)
+            if market in ['NASDAQ', 'NYSE', 'NYSEARCA']:
+                if is_open:
+                    print(f"{market}: {trading_hours} - 交易中")
+                else:
+                    print(f"{market}: {trading_hours} - 收盤中 (使用最新收盤價)")
+            else:
+                if is_open:
+                    print(f"{market}: {trading_hours} - 交易中")
+                else:
+                    print(f"{market}: {trading_hours} - 收盤中")
+    
     def print_portfolio(self):
+        """打印投資組合摘要"""
         table = PrettyTable()
         table.set_style(PLAIN_COLUMNS)
         
@@ -239,5 +281,6 @@ class PortfolioManager:
         print(separator)
 
     def generate_charts(self, output_dir='plots'):
+        """生成圖表"""
         from stock_tracker.utils.plot_utils import create_portfolio_plots
         create_portfolio_plots(self.portfolio, output_dir)
