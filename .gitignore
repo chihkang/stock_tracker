@@ -51,6 +51,8 @@ coverage.xml
 *.egg-info/
 dist/
 build/
+logs/
+backups/
 
 # Local development
 instance/
