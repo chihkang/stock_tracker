@@ -40,33 +40,3 @@ class PortfolioApiClient:
         except Exception as e:
             logger.error(f"更新股票價格時發生錯誤: {str(e)}")
             return False
-
-    async def update_exchange_rate(self, rate: float, source: str = "Google Finance") -> bool:
-        """更新匯率"""
-        url = f"{self.base_url}/api/ExchangeRate/usd"
-        data = {
-            "rate": rate,
-            "updatedBy": "StockTracker",
-            "source": source
-        }
-        
-        try:
-            # logger.info(f"準備發送請求到: {url}")
-            # logger.info(f"請求內容: {json.dumps(data, ensure_ascii=False)}")
-            # logger.info(f"Headers: {json.dumps(self.headers, ensure_ascii=False)}")
-            
-            async with aiohttp.ClientSession() as session:
-                async with session.put(url, json=data) as response:
-                    response_text = await response.text()
-                    # logger.info(f"收到回應狀態碼: {response.status}")
-                    # logger.info(f"收到回應內容: {response_text}")
-                    
-                    if response.status == 200:
-                        logger.info("已成功更新匯率")
-                        return True
-                    else:
-                        logger.error(f"更新匯率失敗。狀態碼: {response.status}")
-                        return False
-        except Exception as e:
-            logger.error(f"更新匯率時發生錯誤: {str(e)}")
-            return False

@@ -3,7 +3,6 @@ from bs4 import BeautifulSoup
 from ..exceptions import ScraperError
 import asyncio
 from ..exceptions import ScraperError
-from ..api import get_api_client
 
 async def update_exchange_rate(currency_pair='USD-TWD'):
     """
@@ -17,15 +16,7 @@ async def update_exchange_rate(currency_pair='USD-TWD'):
     """
     try:
         # 獲取匯率
-        rate = get_exchange_rate(currency_pair)
-        
-        # 更新到 API
-        api_client = get_api_client()
-        success = await api_client.update_exchange_rate(rate)
-        
-        if not success:
-            logger.warning("匯率更新到 API 失敗")
-            
+        rate = get_exchange_rate(currency_pair)        
         return rate
             
     except Exception as e:
