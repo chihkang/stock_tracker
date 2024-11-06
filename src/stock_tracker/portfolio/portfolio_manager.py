@@ -20,10 +20,17 @@ from ..utils.time_utils import get_current_timestamp
 logger = logging.getLogger(__name__)
 
 class PortfolioManager:
-    def __init__(self, file_path='portfolio.json', gist_manager=None):
-        """初始化投資組合管理器"""
+    def __init__(self, file_path='portfolio.json', gist_manager=None, force_update=False):
+        """初始化投資組合管理器
+        
+        Args:
+            file_path (str): 投資組合文件路徑
+            gist_manager: Gist管理器實例
+            force_update (bool): 是否強制更新所有價格，不考慮更新時間限制
+        """
         self.file_path = file_path
         self.gist_manager = gist_manager
+        self.force_update = force_update
         self.portfolio = None
     
     async def initialize(self):
@@ -123,7 +130,8 @@ class PortfolioManager:
         
         for stock in self.portfolio['stocks']:
             market = get_market_from_symbol(stock['name'])
-            if should_update_price(stock['name'], stock.get('lastUpdated')):
+            # 加入 force_update 參數到 should_update_price 的調用
+            if should_update_price(stock['name'], stock.get('lastUpdated'), self.force_update):
                 symbols_to_update.append(stock['name'])
             if market not in market_status:
                 market_status[market] = is_market_open(market)
@@ -131,9 +139,12 @@ class PortfolioManager:
         self._print_market_status(market_status)
         
         if not symbols_to_update:
-            print("\n股票價格更新狀態:")
-            print("- 美股已收盤，使用最新收盤價")
-            print("- 台股無需更新")
+            if self.force_update:
+                print("\n強制更新已啟用，但沒有需要更新的股票")
+            else:
+                print("\n股票價格更新狀態:")
+                print("- 美股已收盤，使用最新收盤價")
+                print("- 台股無需更新")
             
             await self._update_portfolio_calculations()
             return

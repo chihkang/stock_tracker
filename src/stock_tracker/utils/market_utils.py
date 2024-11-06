@@ -1,6 +1,8 @@
 from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 from ..constants import MARKET_HOURS, MARKET_MAPPING
+from typing import Optional  # 添加這行
+
 
 def get_market_from_symbol(symbol: str) -> str:
     """從股票代號取得市場代碼"""
@@ -72,55 +74,46 @@ def is_market_open(market: str, check_time: datetime = None) -> bool:
         
         return trading_start <= current_time <= trading_end
 
-def should_update_price(symbol: str, last_updated: str = None) -> bool:
+def should_update_price(symbol: str, last_updated: Optional[str] = None, force_update: bool = False) -> bool:
     """
-    檢查是否需要更新股價
+    判斷是否應該更新股票價格
     
     Args:
-        symbol: 股票代號
-        last_updated: 上次更新時間的 ISO 格式字串
+        symbol (str): 股票代號
+        last_updated (str, optional): 上次更新時間
+        force_update (bool): 是否強制更新，若為True則忽略時間限制直接更新
     
     Returns:
         bool: 是否需要更新
     """
-    try:
-        market = get_market_from_symbol(symbol)
-        
-        # 如果沒有最後更新時間，需要更新
-        if not last_updated:
-            return True
-            
-        # 解析最後更新時間
-        last_update_time = datetime.fromisoformat(last_updated)
-        current_time = datetime.now(last_update_time.tzinfo)
-        
-        # 如果市場已開市，需要更新
-        if is_market_open(market, current_time):
-            return True
-            
-        # 檢查是否需要取得收盤價
-        # 如果上次更新時間在今天的收盤時間之前，需要更新一次
-        if market in ['NASDAQ', 'NYSE', 'NYSEARCA']:
-            _, market_close = get_us_market_hours()
-        else:
-            market_config = MARKET_HOURS[market]
-            market_close = market_config['trading_hours']['end']
-            
-        last_close = current_time.replace(
-            hour=market_close.hour,
-            minute=market_close.minute,
-            second=0,
-            microsecond=0
-        )
-        
-        if last_update_time < last_close:
-            return True
-            
-        return False
-        
-    except Exception as e:
-        print(f"檢查更新狀態時發生錯誤: {str(e)}")
+    # 如果強制更新模式開啟，直接返回True
+    if force_update:
         return True
+        
+    if not last_updated:
+        return True
+        
+    market = get_market_from_symbol(symbol)
+    
+    # 如果市場開盤中，則需要更新
+    if is_market_open(market):
+        return True
+    
+    # 解析上次更新時間
+    try:
+        # 假設時間戳格式為 ISO 格式
+        last_update_time = datetime.fromisoformat(last_updated.replace('Z', '+00:00'))
+        current_time = datetime.now(timezone.utc)
+        
+        # 如果超過24小時沒更新，則需要更新
+        if (current_time - last_update_time).total_seconds() > 24 * 60 * 60:
+            return True
+            
+    except (ValueError, AttributeError) as e:
+        logger.warning(f"解析更新時間失敗: {str(e)}")
+        return True
+    
+    return False
 
 def format_market_hours(market: str) -> str:
     """

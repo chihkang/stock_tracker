@@ -57,7 +57,7 @@ jobs:
       - name: Update portfolio
         run: |
           echo "Starting portfolio update..."
-          python -m stock_tracker portfolio --debug
+          python -m stock_tracker portfolio -f --debug
         env:
           GIST_ID: ${{ secrets.GIST_ID }}
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
