@@ -62,6 +62,8 @@ jobs:
           GIST_ID: ${{ secrets.GIST_ID }}
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
           PYTHONPATH: ${{ github.workspace }}/src
+          PORTFOLIO_API_URL: ${{secrets.PORTFOLIO_API_URL}}
+          PORTFOLIO_USERNAME: ${{secrets.PORTFOLIO_USERNAME}}
           
       - name: Upload logs
         if: always()
