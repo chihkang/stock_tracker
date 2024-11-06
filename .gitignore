@@ -62,3 +62,4 @@ instance/
 portfolio.json
 .DS_Store.DS_Store
 **/.DS_Store
+appsettings*.json
