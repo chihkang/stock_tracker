@@ -7,11 +7,7 @@ from stock_tracker.exceptions import ScraperError
 def mock_response():
     """模擬網路請求回應"""
     response = MagicMock()
-    response.text = '''
-        <div data-last-price="100.50" data-currency="USD">
-            100.50
-        </div>
-    '''
+    response.text = '{"regularMarketPrice":{"raw":100.50}}'
     return response
 
 def test_get_stock_price_success(mock_response):
@@ -19,11 +15,11 @@ def test_get_stock_price_success(mock_response):
     with patch('requests.get') as mock_get:
         mock_get.return_value = mock_response
         
-        price, currency, timestamp = get_stock_price("TSLA:NASDAQ")
+        price_info = get_stock_price("TSLA:NASDAQ")
         
-        assert price == 100.50
-        assert currency == "USD"
-        assert timestamp is not None
+        assert price_info["price"] == 100.50
+        assert price_info["currency"] == "USD"
+        assert price_info["timestamp"] is not None
 
 def test_get_stock_price_network_error():
     """測試網路錯誤情況"""

@@ -1,6 +1,6 @@
 # Stock Tracker
 
-A Python tool for retrieving real-time stock prices from Google Finance and Yahoo Finance, supporting stock price queries across multiple exchanges and currency conversion, with intelligent trading time detection.
+A Python tool for retrieving real-time stock prices through market-routed providers, supporting stock price queries across multiple exchanges and currency conversion, with intelligent trading time detection and strict update health reporting.
 
 ## Architecture
 
@@ -13,8 +13,8 @@ graph TB
     end
 
     subgraph "Data Sources"
-        D1["Google Finance\n(Primary)"] --> |Real-time Data| C
-        D2["Yahoo Finance\n(Backup)"] --> |Real-time Data| C
+        D1["Yahoo Taiwan Provider\n(TPE/TWO)"] --> |Market-routed Data| C
+        D2["Yahoo Finance Provider\n(NASDAQ/NYSE/NYSEARCA)"] --> |Market-routed Data| C
         D3["Exchange Rate\nService"] --> |USD-TWD Rate| C
     end
 
@@ -58,15 +58,16 @@ graph TB
 
 ## Features
 
-- Multiple Data Sources
-  - Google Finance (primary source)
-  - Yahoo Finance Taiwan (backup source, supports special stock codes like OTC market)
+- Market-Routed Data Sources
+  - Yahoo Taiwan provider for Taiwan symbols such as `2330:TPE` -> `2330.TW`
+  - Yahoo Finance provider for US symbols such as `AAPL:NASDAQ` -> `AAPL`
+  - Provider routing is based on the exchange suffix instead of sending every symbol through the same fallback chain
 - Intelligent Trading Time Management
   - Automatic market trading time detection
   - Support for US stock market DST/ST automatic switching
   - Price updates only during trading hours
 - Real-time Currency Conversion
-  - Automatic USD-TWD exchange rate from Google Finance
+  - Automatic USD-TWD exchange rate through a no-key public JSON exchange-rate endpoint
   - Exchange rates displayed to two decimal places
 - Portfolio Visualization
   - Asset allocation pie chart
@@ -75,6 +76,10 @@ graph TB
   - Full Traditional Chinese display support
 - Modular design, easy to extend
 - Support for multiple exchanges
+- Strict update health reporting
+  - `success`: all requested stock prices were updated
+  - `partial_success`: some stock prices were updated and written back, but the GitHub Actions job exits non-zero
+  - `failed`: no stock prices were updated; only `updateStatus` is written back
 
 ## System Requirements
 
@@ -155,11 +160,44 @@ MAX_RETRIES=3
       "lastUpdated": "2024-10-24T17:30:28+08:00",
       "percentageOfTotal": 11.93
     }
-  ]
+  ],
+  "updateStatus": {
+    "status": "success",
+    "retrieved_at": "2026-05-04T15:20:00+08:00",
+    "updatedSymbols": ["2330:TPE", "TSLA:NASDAQ"],
+    "failedSymbols": [],
+    "exchangeRate": {
+      "status": "success",
+      "usedPreviousRate": false,
+      "rate": "32.08",
+      "updatedAt": "2026-05-04T15:19:59+08:00"
+    }
+  }
 }
 ```
 
 The program will first try to read from the configured GIST, and if unavailable, will fall back to the local portfolio.json file.
+
+### Update Status Metadata
+
+`portfolio.json` includes a top-level `updateStatus` object so the GIST can report the health of the latest automation run:
+
+- `status`: one of `success`, `partial_success`, or `failed`
+- `retrieved_at`: when this update attempt ran
+- `updatedSymbols`: symbols that received a fresh price during this run
+- `failedSymbols`: concise symbol-level failures, using fixed reason codes plus an optional message
+- `exchangeRate`: exchange-rate status; when the exchange-rate provider fails, the previous `exchange rate` and `exchange_rate_updated` values are kept and `usedPreviousRate` is `true`
+
+Failure reason codes:
+
+- `price_unavailable`
+- `rate_unavailable`
+- `provider_http_error`
+- `provider_parse_error`
+- `unsupported_symbol`
+- `api_update_failed`
+- `gist_read_failed`
+- `gist_write_failed`
 
 ### GitHub Actions Integration
 
@@ -174,6 +212,14 @@ The repository includes GitHub Actions workflow for automated portfolio updates:
    - Update portfolio data
    - Generate new charts
    - Update the GIST with latest data
+
+The workflow intentionally uses strict success semantics:
+
+- `success`: all requested stock symbols updated; the job exits `0`
+- `partial_success`: at least one symbol updated and the GIST is written, but at least one symbol failed; the job exits non-zero
+- `failed`: no symbols updated; only `updateStatus` is written to the GIST, and existing prices, totals, percentages, exchange rate, and `exchange_rate_updated` are preserved; the job exits non-zero
+
+If the exchange-rate provider fails while stock prices are written, the previous exchange rate is reused. `exchange_rate_updated` is not changed, and `updateStatus.exchangeRate.message` records that the old rate was used.
 
 Example workflow file (.github/workflows/update-portfolio.yml):
 
@@ -236,7 +282,7 @@ jobs:
       - name: Update portfolio
         run: |
           echo "Starting portfolio update..."
-          python -m stock_tracker portfolio --debug
+          python -m stock_tracker portfolio -f --debug
         env:
           GIST_ID: ${{ secrets.GIST_ID }}
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}

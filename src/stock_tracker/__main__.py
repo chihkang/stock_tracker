@@ -80,9 +80,13 @@ async def async_main():
         # 使用 await 調用非同步方法
         if args.force:
             logger.info("強制更新模式已啟用，將更新所有股票價格")
-        await portfolio_manager.update_prices()
+        update_result = await portfolio_manager.update_prices()
         portfolio_manager.print_portfolio()
-        
+
+        if update_result and update_result.status != "success":
+            logger.error("投資組合更新未完整成功: %s", update_result.status)
+            return 1
+
         return 0
 
 def main():

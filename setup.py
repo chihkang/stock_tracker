@@ -10,6 +10,8 @@ setup(
         "beautifulsoup4>=4.12.0",
         "pytz>=2024.1",
         "python-dotenv>=1.0.0",
+        "prettytable>=3.11.0",
+        "aiohttp>=3.8.1",
     ],
     extras_require={
         "dev": [
