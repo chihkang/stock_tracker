@@ -342,3 +342,64 @@ async def _assert_full_success_replaces_existing_history_entry_for_same_day(tmp_
         "totalValueTwd": 1128.0,
         "sourceUpdatedAt": "2026-05-07T14:26:19+08:00",
     }
+
+
+def test_full_success_uses_local_seed_when_gist_history_is_missing(tmp_path, monkeypatch):
+    asyncio.run(_assert_full_success_uses_local_seed_when_gist_history_is_missing(tmp_path, monkeypatch))
+
+
+async def _assert_full_success_uses_local_seed_when_gist_history_is_missing(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "stock_tracker.portfolio.portfolio_manager.get_current_timestamp",
+        lambda: "2026-05-07T14:26:19+08:00",
+    )
+    with open(tmp_path / "portfolio-history.json", "w", encoding="utf-8") as f:
+        json.dump(
+            {
+                "updatedAt": "2026-05-06T22:59:23+08:00",
+                "values": [
+                    {
+                        "date": "2026-05-06",
+                        "totalValueTwd": 990.0,
+                        "sourceUpdatedAt": "2026-05-06T22:59:23+08:00",
+                    }
+                ],
+            },
+            f,
+        )
+
+    portfolio = base_portfolio()
+    gist = FakeGistManager(portfolio, history={"values": []})
+    batch = PriceUpdateBatch(
+        prices={
+            "2330:TPE": PriceResult(
+                symbol="2330:TPE",
+                price=120.0,
+                currency="TWD",
+                retrieved_at="2026-05-07T14:26:00+08:00",
+                source="test",
+            ),
+            "AAPL:NASDAQ": PriceResult(
+                symbol="AAPL:NASDAQ",
+                price=12.0,
+                currency="USD",
+                retrieved_at="2026-05-07T14:26:01+08:00",
+                source="test",
+            ),
+        },
+        failures={},
+    )
+    manager = PortfolioManager(
+        file_path=str(tmp_path / "portfolio.json"),
+        gist_manager=gist,
+        force_update=True,
+        price_service=FakePriceService(batch),
+        exchange_rate_service=FakeExchangeRateService(32.0),
+    )
+
+    await manager.initialize()
+    result = await manager.update_prices()
+
+    assert result.status == "success"
+    history = gist.saved_histories[-1]
+    assert [entry["date"] for entry in history["values"]] == ["2026-05-06", "2026-05-07"]

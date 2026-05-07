@@ -119,6 +119,10 @@ class PortfolioManager:
     async def _build_history_data(self):
         if self.gist_manager and hasattr(self.gist_manager, "read_history"):
             history_data = await self.gist_manager.read_history()
+            if isinstance(history_data, dict) and not history_data.get("values"):
+                local_history = self._load_local_history()
+                if local_history.get("values"):
+                    history_data = local_history
         else:
             history_data = self._load_local_history()
 
