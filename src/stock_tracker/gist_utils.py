@@ -7,6 +7,8 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+HISTORY_FILENAME = 'portfolio-history.json'
+
 class GistManager:
     def __init__(self, gist_id, token):
         self.gist_id = gist_id
@@ -32,15 +34,39 @@ class GistManager:
             logger.error(f"從 Gist 讀取失敗: {str(e)}")
             return None
 
-    async def update_portfolio(self, portfolio_data):
-        """更新 Gist 中的 portfolio.json"""
+    async def read_history(self):
+        """從 Gist 讀取 portfolio-history.json；檔案不存在時回傳空歷史。"""
         try:
-            payload = {
-                'files': {
-                    'portfolio.json': {
-                        'content': json.dumps(portfolio_data, indent=2, ensure_ascii=False)
-                    }
+            async with aiohttp.ClientSession(headers=self.headers) as session:
+                async with session.get(self.base_url) as response:
+                    if response.status == 200:
+                        gist_data = await response.json()
+                        history_file = gist_data.get('files', {}).get(HISTORY_FILENAME)
+                        if not history_file:
+                            return {'values': []}
+                        return json.loads(history_file.get('content') or '{"values": []}')
+                    else:
+                        logger.error(f"從 Gist 讀取歷史檔失敗: {response.status}")
+                        return {'values': []}
+        except Exception as e:
+            logger.error(f"從 Gist 讀取歷史檔失敗: {str(e)}")
+            return {'values': []}
+
+    async def update_portfolio(self, portfolio_data, history_data=None):
+        """更新 Gist 中的 portfolio.json，必要時同步 portfolio-history.json"""
+        try:
+            files = {
+                'portfolio.json': {
+                    'content': json.dumps(portfolio_data, indent=2, ensure_ascii=False)
                 }
+            }
+            if history_data is not None:
+                files[HISTORY_FILENAME] = {
+                    'content': json.dumps(history_data, indent=2, ensure_ascii=False)
+                }
+
+            payload = {
+                'files': files
             }
             
             async with aiohttp.ClientSession(headers=self.headers) as session:

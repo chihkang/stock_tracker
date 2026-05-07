@@ -3,6 +3,7 @@ import json
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 import pytz
 import logging
 from prettytable import PrettyTable, PLAIN_COLUMNS
@@ -18,6 +19,7 @@ from ..utils.market_utils import (
 from ..utils.time_utils import get_current_timestamp
 
 logger = logging.getLogger(__name__)
+HISTORY_FILENAME = "portfolio-history.json"
 
 
 @dataclass
@@ -84,17 +86,23 @@ class PortfolioManager:
             logger.error(f"讀取本地檔案失敗: {str(e)}")
             raise FileNotFoundError(f"無法讀取投資組合資料: {str(e)}")
             
-    async def _save_portfolio(self):
+    async def _save_portfolio(self, update_history=False):
         """保存到本地文件和 Gist"""
         try:
+            history_data = None
+            if update_history:
+                history_data = await self._build_history_data()
+
             # 更新本地檔案
             with open(self.file_path, 'w', encoding='utf-8') as f:
                 json.dump(self.portfolio, f, indent=2, ensure_ascii=False)
             logger.info("已更新本地投資組合檔案")
+            if history_data is not None:
+                self._save_local_history(history_data)
             
             # 更新 Gist（如果有設定）
             if self.gist_manager:
-                success = await self.gist_manager.update_portfolio(self.portfolio)
+                success = await self.gist_manager.update_portfolio(self.portfolio, history_data=history_data)
                 if success:
                     logger.info("已更新 Gist 投資組合")
                     # 建立備份
@@ -107,6 +115,61 @@ class PortfolioManager:
         except Exception as e:
             logger.error(f"儲存投資組合失敗: {str(e)}")
             raise
+
+    async def _build_history_data(self):
+        if self.gist_manager and hasattr(self.gist_manager, "read_history"):
+            history_data = await self.gist_manager.read_history()
+        else:
+            history_data = self._load_local_history()
+
+        if not isinstance(history_data, dict):
+            history_data = {"values": []}
+
+        entry = self._current_history_entry()
+        values = [
+            value for value in history_data.get("values", [])
+            if isinstance(value, dict) and value.get("date") != entry["date"]
+        ]
+        values.append(entry)
+        values.sort(key=lambda value: value.get("date", ""))
+
+        updated_history = deepcopy(history_data)
+        updated_history["updatedAt"] = entry["sourceUpdatedAt"]
+        updated_history["values"] = values
+        return updated_history
+
+    def _current_history_entry(self):
+        retrieved_at = self.portfolio.get("updateStatus", {}).get("retrieved_at") or get_current_timestamp()
+        return {
+            "date": self._taipei_date_key(retrieved_at),
+            "totalValueTwd": self.portfolio["totalValue"],
+            "sourceUpdatedAt": retrieved_at,
+        }
+
+    def _taipei_date_key(self, timestamp):
+        try:
+            normalized = timestamp.replace("Z", "+00:00")
+            parsed = datetime.fromisoformat(normalized)
+            if parsed.tzinfo is None:
+                parsed = pytz.timezone("Asia/Taipei").localize(parsed)
+            return parsed.astimezone(pytz.timezone("Asia/Taipei")).date().isoformat()
+        except Exception:
+            return str(timestamp)[:10]
+
+    def _history_file_path(self):
+        return Path(self.file_path).with_name(HISTORY_FILENAME)
+
+    def _load_local_history(self):
+        history_path = self._history_file_path()
+        if not history_path.exists():
+            return {"values": []}
+        with open(history_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+
+    def _save_local_history(self, history_data):
+        with open(self._history_file_path(), "w", encoding="utf-8") as f:
+            json.dump(history_data, f, indent=2, ensure_ascii=False)
+        logger.info("已更新本地投資組合歷史檔案")
     
     async def update_exchange_rate(self):
         """更新匯率"""
@@ -228,7 +291,7 @@ class PortfolioManager:
             failures=failures,
             exchange_status=exchange_status,
         )
-        await self._save_portfolio()
+        await self._save_portfolio(update_history=status == "success")
         self._print_update_statistics(us_stocks_count, local_stocks_count, original_portfolio)
 
         return UpdateResult(

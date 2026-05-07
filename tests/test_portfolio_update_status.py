@@ -1,4 +1,5 @@
 import asyncio
+import json
 from copy import deepcopy
 
 from stock_tracker.portfolio.portfolio_manager import PortfolioManager
@@ -11,15 +12,22 @@ from stock_tracker.providers.market_data import (
 
 
 class FakeGistManager:
-    def __init__(self, portfolio):
+    def __init__(self, portfolio, history=None):
         self.portfolio = deepcopy(portfolio)
+        self.history = deepcopy(history) if history is not None else {"values": []}
         self.saved_portfolios = []
+        self.saved_histories = []
 
     async def read_portfolio(self):
         return deepcopy(self.portfolio)
 
-    async def update_portfolio(self, portfolio_data):
+    async def read_history(self):
+        return deepcopy(self.history)
+
+    async def update_portfolio(self, portfolio_data, history_data=None):
         self.saved_portfolios.append(deepcopy(portfolio_data))
+        if history_data is not None:
+            self.saved_histories.append(deepcopy(history_data))
         return True
 
     async def create_backup(self, portfolio_data, backup_dir="backups"):
@@ -116,6 +124,16 @@ async def _assert_full_success_updates_prices_status_and_returns_success(tmp_pat
     assert saved["updateStatus"]["status"] == "success"
     assert saved["updateStatus"]["updatedSymbols"] == ["2330:TPE", "AAPL:NASDAQ"]
     assert saved["updateStatus"]["failedSymbols"] == []
+    history = gist.saved_histories[-1]
+    assert history["updatedAt"] == saved["updateStatus"]["retrieved_at"]
+    assert history["values"][-1] == {
+        "date": saved["updateStatus"]["retrieved_at"][:10],
+        "totalValueTwd": 1128.0,
+        "sourceUpdatedAt": saved["updateStatus"]["retrieved_at"],
+    }
+    with open(tmp_path / "portfolio-history.json", encoding="utf-8") as f:
+        local_history = json.load(f)
+    assert local_history == history
 
 
 def test_partial_success_writes_successful_prices_and_marks_partial(tmp_path):
@@ -167,6 +185,8 @@ async def _assert_partial_success_writes_successful_prices_and_marks_partial(tmp
             "message": "No provider returned a valid price",
         }
     ]
+    assert gist.saved_histories == []
+    assert not (tmp_path / "portfolio-history.json").exists()
 
 
 def test_failed_update_only_writes_update_status(tmp_path):
@@ -202,6 +222,8 @@ async def _assert_failed_update_only_writes_update_status(tmp_path):
     assert saved["stocks"] == portfolio["stocks"]
     assert saved["updateStatus"]["status"] == "failed"
     assert saved["updateStatus"]["updatedSymbols"] == []
+    assert gist.saved_histories == []
+    assert not (tmp_path / "portfolio-history.json").exists()
 
 
 def test_exchange_rate_failure_keeps_previous_rate_and_writes_warning(tmp_path):
@@ -250,3 +272,73 @@ async def _assert_exchange_rate_failure_keeps_previous_rate_and_writes_warning(t
     assert saved["updateStatus"]["exchangeRate"]["status"] == "failed"
     assert saved["updateStatus"]["exchangeRate"]["usedPreviousRate"] is True
     assert "使用舊匯率" in saved["updateStatus"]["exchangeRate"]["message"]
+    assert gist.saved_histories[-1]["values"][-1]["totalValueTwd"] == 1116.96
+
+
+def test_full_success_replaces_existing_history_entry_for_same_day(tmp_path, monkeypatch):
+    asyncio.run(_assert_full_success_replaces_existing_history_entry_for_same_day(tmp_path, monkeypatch))
+
+
+async def _assert_full_success_replaces_existing_history_entry_for_same_day(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "stock_tracker.portfolio.portfolio_manager.get_current_timestamp",
+        lambda: "2026-05-07T14:26:19+08:00",
+    )
+    portfolio = base_portfolio()
+    gist = FakeGistManager(
+        portfolio,
+        history={
+            "updatedAt": "2026-05-07T08:00:00+08:00",
+            "values": [
+                {
+                    "date": "2026-05-06",
+                    "totalValueTwd": 990.0,
+                    "sourceUpdatedAt": "2026-05-06T14:00:00+08:00",
+                },
+                {
+                    "date": "2026-05-07",
+                    "totalValueTwd": 1000.0,
+                    "sourceUpdatedAt": "2026-05-07T08:00:00+08:00",
+                },
+            ],
+        },
+    )
+    batch = PriceUpdateBatch(
+        prices={
+            "2330:TPE": PriceResult(
+                symbol="2330:TPE",
+                price=120.0,
+                currency="TWD",
+                retrieved_at="2026-05-07T14:26:00+08:00",
+                source="test",
+            ),
+            "AAPL:NASDAQ": PriceResult(
+                symbol="AAPL:NASDAQ",
+                price=12.0,
+                currency="USD",
+                retrieved_at="2026-05-07T14:26:01+08:00",
+                source="test",
+            ),
+        },
+        failures={},
+    )
+    manager = PortfolioManager(
+        file_path=str(tmp_path / "portfolio.json"),
+        gist_manager=gist,
+        force_update=True,
+        price_service=FakePriceService(batch),
+        exchange_rate_service=FakeExchangeRateService(32.0),
+    )
+
+    await manager.initialize()
+    result = await manager.update_prices()
+
+    assert result.status == "success"
+    history = gist.saved_histories[-1]
+    assert history["updatedAt"] == "2026-05-07T14:26:19+08:00"
+    assert [entry["date"] for entry in history["values"]] == ["2026-05-06", "2026-05-07"]
+    assert history["values"][1] == {
+        "date": "2026-05-07",
+        "totalValueTwd": 1128.0,
+        "sourceUpdatedAt": "2026-05-07T14:26:19+08:00",
+    }
